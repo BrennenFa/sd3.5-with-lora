@@ -12,7 +12,7 @@ import torch
 from diffusers import StableDiffusion3Pipeline
 from peft import PeftModel
 
-from precompute_latents import precompute_latents
+from .precompute_latents import precompute_latents
 
 
 def train_genus(
