@@ -449,7 +449,7 @@ def main():
             logger.warning(f"Could not enable xformers: {e}")
 
     # Initialize wandb if requested - needs wifi
-    # use_wandb = args.report_to == "wandb" and wandb is not None
+    use_wandb = args.report_to == "wandb" and wandb is not None
     # if use_wandb:
     #     wandb.init(
     #         project="Tree-Gen",
