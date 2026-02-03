@@ -448,6 +448,14 @@ def main():
         except Exception as e:
             logger.warning(f"Could not enable xformers: {e}")
 
+    # Compile transformer for additional speedup (PyTorch 2.0+)
+    try:
+        logger.info("Compiling transformer with torch.compile for additional speedup...")
+        transformer = torch.compile(transformer, mode="reduce-overhead")
+        logger.info("Transformer compilation successful")
+    except Exception as e:
+        logger.warning(f"Could not compile transformer (requires PyTorch 2.0+): {e}")
+
     # Initialize wandb if requested - needs wifi
     use_wandb = args.report_to == "wandb" and wandb is not None
     # if use_wandb:
