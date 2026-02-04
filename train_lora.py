@@ -279,30 +279,49 @@ def main():
             if os.path.exists(os.path.join(potential_latents_dir, "latents.pt")):
                 genus_latents_dir = potential_latents_dir
 
-        success = train_genus(
-            genus=genus,
-            train_data_dir=train_data_dir,
-            output_dir=output_dir,
-            model_id=model_id,
-            resolution=resolution,
-            train_batch_size=train_batch_size,
-            num_epochs=num_epochs,
-            learning_rate=learning_rate,
-            mixed_precision=mixed_precision,
-            gradient_accumulation_steps=gradient_accumulation_steps,
-            checkpointing_steps=checkpointing_steps,
-            validation_epochs=validation_epochs,
-            use_wandb=use_wandb,
-            latents_dir=genus_latents_dir
-        )
+        # Check if LoRA already exists — skip training and go straight to generation
+        lora_path = output_dir
+        success = False
+        if os.path.exists(os.path.join(output_dir, "adapter_config.json")):
+            # Final trained model exists
+            print(f"{genus}: Trained LoRA already exists at {output_dir}, skipping training...")
+            success = True
+        elif os.path.exists(output_dir):
+            # Check for latest checkpoint from an interrupted run
+            checkpoints = sorted(
+                [d for d in os.listdir(output_dir) if d.startswith("checkpoint-")],
+                key=lambda x: int(x.split("-")[1])
+            )
+            if checkpoints:
+                lora_path = os.path.join(output_dir, checkpoints[-1])
+                print(f"{genus}: Found checkpoint {checkpoints[-1]}, skipping to generation...")
+                success = True
+
+        if not success:
+            success = train_genus(
+                genus=genus,
+                train_data_dir=train_data_dir,
+                output_dir=output_dir,
+                model_id=model_id,
+                resolution=resolution,
+                train_batch_size=train_batch_size,
+                num_epochs=num_epochs,
+                learning_rate=learning_rate,
+                mixed_precision=mixed_precision,
+                gradient_accumulation_steps=gradient_accumulation_steps,
+                checkpointing_steps=checkpointing_steps,
+                validation_epochs=validation_epochs,
+                use_wandb=use_wandb,
+                latents_dir=genus_latents_dir
+            )
 
         results[genus] = "success" if success else "failed"
 
-        # Generate images after successful training
+        # Generate images after successful training (or from existing checkpoint)
         if success and not args.skip_generation:
             gen_success = generate_images_for_genus(
                 genus=genus,
-                lora_path=output_dir,
+                lora_path=lora_path,
                 base_model_id=model_id,
                 output_dir=output_dir,
                 num_images=args.num_images

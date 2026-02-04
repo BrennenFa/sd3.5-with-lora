@@ -131,26 +131,11 @@ def learning_rate_generator(optimizer, num_warmup_steps, num_training_steps):
 def main():
     args = parse_args()
 
+    # Must be set before any CUDA call — ignored if runtime is already initialized
+    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
-
-    # Set CUDA memory allocator config to avoid fragmentation
-    if torch.cuda.is_available():
-        os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
-        torch.cuda.empty_cache()
-
-        # Check initial GPU memory
-        total_memory = torch.cuda.get_device_properties(device).total_memory / 1024**3
-        allocated_memory = torch.cuda.memory_allocated(device) / 1024**3
-        free_memory = total_memory - allocated_memory
-        logger.info(f"GPU: {torch.cuda.get_device_name(device)}")
-        logger.info(f"Total GPU memory: {total_memory:.2f} GB")
-        logger.info(f"Initially allocated: {allocated_memory:.2f} GB")
-        logger.info(f"Initially free: {free_memory:.2f} GB")
-
-        if free_memory < 20:
-            logger.warning(f"WARNING: Only {free_memory:.2f} GB free on GPU. SD3.5 needs ~20+ GB.")
-            logger.warning("Consider killing other GPU processes or using a less busy GPU.")
 
     # make output directory
     os.makedirs(args.output_dir, exist_ok=True)
@@ -222,11 +207,11 @@ def main():
     )
 
     # Transformer: MMDiT (Multimodal Diffusion Transformer) - replaces UNet
-    # Load on CPU first to avoid memory spikes
+    # Load in weight_dtype (bf16) to fit in 40 GB GPU
     transformer = SD3Transformer2DModel.from_pretrained(
         sd3_path,
         subfolder="transformer",
-        torch_dtype=torch.float32,
+        torch_dtype=weight_dtype,
         local_files_only=True,
         low_cpu_mem_usage=True
     )
@@ -254,6 +239,20 @@ def main():
         bias="none"
     )
     transformer = get_peft_model(transformer, lora_config)
+
+    # Check GPU memory right before first allocation
+    if torch.cuda.is_available():
+        total_memory = torch.cuda.get_device_properties(device).total_memory / 1024**3
+        allocated_memory = torch.cuda.memory_allocated(device) / 1024**3
+        free_memory = total_memory - allocated_memory
+        logger.info(f"GPU: {torch.cuda.get_device_name(device)}")
+        logger.info(f"Total GPU memory: {total_memory:.2f} GB")
+        logger.info(f"Allocated: {allocated_memory:.2f} GB")
+        logger.info(f"Free: {free_memory:.2f} GB")
+
+        if free_memory < 20:
+            logger.warning(f"WARNING: Only {free_memory:.2f} GB free on GPU. SD3.5 needs ~20+ GB.")
+            logger.warning("Consider killing other GPU processes or using a less busy GPU.")
 
     # Move only text encoders to device temporarily (for embedding computation)
     # Keep VAE and transformer off GPU for now to save memory
@@ -381,10 +380,9 @@ def main():
         encoder_hidden_states = torch.cat([clip_embeds_padded, hidden_states_t5], dim=1)
         # encoder_hidden_states shape: [1, 333, 4096] (77 + 256)
 
-    # Convert embeddings to fp32 to match transformer dtype
-    # Text encoders use weight_dtype (fp16) but transformer is fp32 for training stability
-    encoder_hidden_states = encoder_hidden_states.to(torch.float32)
-    pooled_embeds = pooled_embeds.to(torch.float32)
+    # Match transformer dtype
+    encoder_hidden_states = encoder_hidden_states.to(weight_dtype)
+    pooled_embeds = pooled_embeds.to(weight_dtype)
 
     logger.info(f"Text embeddings computed for genus: {genus}")
 
@@ -448,14 +446,6 @@ def main():
         except Exception as e:
             logger.warning(f"Could not enable xformers: {e}")
 
-    # Compile transformer for additional speedup (PyTorch 2.0+)
-    try:
-        logger.info("Compiling transformer with torch.compile for additional speedup...")
-        transformer = torch.compile(transformer, mode="reduce-overhead")
-        logger.info("Transformer compilation successful")
-    except Exception as e:
-        logger.warning(f"Could not compile transformer (requires PyTorch 2.0+): {e}")
-
     # Initialize wandb if requested - needs wifi
     use_wandb = args.report_to == "wandb" and wandb is not None
     # if use_wandb:
@@ -501,7 +491,7 @@ def main():
             # Get latents - either pre-computed or encode on the fly
             if use_precomputed_latents:
                 # FAST path: latents already computed
-                latents = batch["latents"].to(device, dtype=torch.float32)
+                latents = batch["latents"].to(device, dtype=weight_dtype)
             else:
                 # SLOW path: encode images through VAE
                 pixel_values = batch["pixel_values"].to(device, dtype=weight_dtype)
@@ -514,18 +504,18 @@ def main():
                         latents = vae.encode(pixel_values).latent_dist.sample()
                         latents = latents * vae.config.scaling_factor
 
-                    latents = latents.to(torch.float32)
+                    latents = latents.to(weight_dtype)
 
             # Sample noise
             noise = torch.randn_like(latents)
             bsz = latents.shape[0]
 
             # Sample timesteps (continuous time for flow matching)
-            # Ensure timesteps match latents dtype (fp32)
             timesteps = torch.rand((bsz,), device=device, dtype=torch.float32)
 
             # Add noise using flow matching: x_t = (1-t)*x_0 + t*noise
-            noisy_latents = (1 - timesteps.view(-1, 1, 1, 1)) * latents + timesteps.view(-1, 1, 1, 1) * noise
+            # Cast back to weight_dtype — fp32 timesteps promote the result to fp32
+            noisy_latents = ((1 - timesteps.view(-1, 1, 1, 1)) * latents + timesteps.view(-1, 1, 1, 1) * noise).to(weight_dtype)
 
             # Expand encoder hidden states to match batch size
             encoder_batch = encoder_hidden_states.repeat(bsz, 1, 1)
@@ -555,9 +545,9 @@ def main():
                     return_dict=False
                 )[0]
 
-            # Flow matching loss: target is velocity
+            # Flow matching loss: target is velocity; cast to fp32 for stable loss computation
             target = noise - latents
-            loss = F.mse_loss(model_pred, target, reduction="mean")
+            loss = F.mse_loss(model_pred.float(), target.float(), reduction="mean")
 
             # Backward with gradient accumulation
             loss = loss / args.gradient_accumulation_steps
