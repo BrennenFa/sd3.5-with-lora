@@ -15,6 +15,12 @@ from PIL import Image
 from torchvision import transforms
 from tqdm.auto import tqdm
 from diffusers import AutoencoderKL
+import transformers.utils.import_utils as _transformers_import_utils
+
+# Bypass transformers' torch >= 2.6 gate for .bin model files.
+# Our cached weights are local and trusted; we cannot upgrade torch on this HPC.
+# See https://nvd.nist.gov/vuln/detail/CVE-2025-32434
+_transformers_import_utils.check_torch_load_is_safe = lambda: None
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

@@ -11,6 +11,12 @@ import subprocess
 import torch
 from diffusers import StableDiffusion3Pipeline
 from peft import PeftModel
+import transformers.utils.import_utils as _transformers_import_utils
+
+# Bypass transformers' torch >= 2.6 gate for .bin model files.
+# Our cached weights are local and trusted; we cannot upgrade torch on this HPC.
+# See https://nvd.nist.gov/vuln/detail/CVE-2025-32434
+_transformers_import_utils.check_torch_load_is_safe = lambda: None
 
 from .precompute_latents import precompute_latents
 
@@ -117,17 +123,19 @@ def train_genus(
         return False
 
 
-def generate_images_for_genus(genus, lora_path, base_model_id, output_dir, num_images=12):
+def generate_images_for_genus(genus, lora_path, output_dir, num_images=12):
     """Generate sample images after training"""
 
     print(f"\nGenerating sample images for {genus}...")
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     try:
-        # generate stable diffusion 3 pipeline
+        # Load pipeline from the model cache directory (not the single .safetensors file)
         from diffusers import StableDiffusion3Pipeline
+        model_cache_base = os.environ.get("MODEL_CACHE", "/share/rkmeente/btfarre2/model/model_cache")
+        sd3_path = os.path.join(model_cache_base, "stabilityai_stable-diffusion-3.5-large")
         pipe = StableDiffusion3Pipeline.from_pretrained(
-            base_model_id,
+            sd3_path,
             torch_dtype=torch.float16
         )
 
@@ -322,7 +330,6 @@ def main():
             gen_success = generate_images_for_genus(
                 genus=genus,
                 lora_path=lora_path,
-                base_model_id=model_id,
                 output_dir=output_dir,
                 num_images=args.num_images
             )

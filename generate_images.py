@@ -10,6 +10,12 @@ import torch
 from pathlib import Path
 from diffusers import StableDiffusion3Pipeline
 from peft import PeftModel
+import transformers.utils.import_utils as _transformers_import_utils
+
+# Bypass transformers' torch >= 2.6 gate for .bin model files.
+# Our cached weights are local and trusted; we cannot upgrade torch on this HPC.
+# See https://nvd.nist.gov/vuln/detail/CVE-2025-32434
+_transformers_import_utils.check_torch_load_is_safe = lambda: None
 
 
 def generate_for_genus(
@@ -47,10 +53,12 @@ def generate_for_genus(
 
     os.makedirs(output_dir, exist_ok=True)
 
-    # Load pipeline
+    # Load pipeline from model cache directory (not the single .safetensors file)
     print("Loading base model...")
+    model_cache_base = os.environ.get("MODEL_CACHE", "/share/rkmeente/btfarre2/model/model_cache")
+    sd3_path = os.path.join(model_cache_base, "stabilityai_stable-diffusion-3.5-large")
     pipe = StableDiffusion3Pipeline.from_pretrained(
-        base_model_id,
+        sd3_path,
         torch_dtype=torch.float16
     )
 

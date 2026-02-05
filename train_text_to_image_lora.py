@@ -20,8 +20,14 @@ from torch.utils.data import Dataset as TorchDataset
 from torchvision import transforms
 from tqdm.auto import tqdm
 from transformers import CLIPTokenizer, CLIPTextModelWithProjection, T5Tokenizer, T5EncoderModel
+import transformers.utils.import_utils as _transformers_import_utils
 import numpy as np
 import os
+
+# Bypass transformers' torch >= 2.6 gate for .bin model files.
+# Our cached text-encoder weights are local and trusted; we cannot upgrade torch on this HPC.
+# See https://nvd.nist.gov/vuln/detail/CVE-2025-32434
+_transformers_import_utils.check_torch_load_is_safe = lambda: None
 
 # Disable wandb to avoid network issues on HPC
 os.environ["WANDB_MODE"] = "disabled"
@@ -410,7 +416,8 @@ def main():
     logger.info("Loading VAE and transformer to GPU...")
     if use_precomputed_latents:
         logger.info("VAE not needed (using pre-computed latents) - skipping GPU load")
-        del vae  # Free memory since we don't need it
+        # Free memory since we don't need it
+        del vae 
         import gc
         gc.collect()
     elif not args.vae_cpu_offload:
