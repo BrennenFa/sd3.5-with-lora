@@ -3,7 +3,7 @@
   "model_path": "/share/rkmeente/btfarre2/model/sd3.5_large.safetensors",
   "train_data_dir": "/rs1/researchers/c/cmjone25/auto_arborist_cvpr2022_v0.15/data/tree_classification/aa_inat_combined/full_100_genera_train_test_sept24/train_full",
   "test_data_dir": "/rs1/researchers/c/cmjone25/auto_arborist_cvpr2022_v0.15/data/tree_classification/aa_inat_combined/full_100_genera_train_test_sept24/test_full",
-  "output_path": "/share/rkmeente/btfarre2/stablediffusion-sd3",
+  "output_path": "/rs1/researchers/c/cmjone25/auto_arborist_cvpr2022_v0.15/data/tree_classification/sd/3.5",
   "latents_cache_dir": "/share/rkmeente/btfarre2/stablediffusion-sd3/latents_cache",
   "precompute_latents": true,
   "selected_genera": [

@@ -11,7 +11,7 @@
 #BSUB -R rusage[mem=64]
 
 module load conda
-source activate /usr/local/usrapps/rkmeente/btfarre2/conda_envs/pytorch
+conda activate /usr/local/usrapps/rkmeente/btfarre2/conda_envs/sd_lora_torch260
 
 export HF_DATASETS_CACHE=/share/rkmeente/btfarre2/model/model_cache/datasets
 export TRANSFORMERS_CACHE=/share/rkmeente/btfarre2/model/model_cache
