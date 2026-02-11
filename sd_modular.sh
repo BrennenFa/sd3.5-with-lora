@@ -6,7 +6,7 @@
 #BSUB -e stderr.%J
 #BSUB -q gpu
 #BSUB -R span[hosts=1]
-#BSUB -gpu "num=1:mode=exclusive_process:mps=no"
+#BSUB -gpu "num=1:mode=shared:mps=no"
 #BSUB -R "select[ h100 || a100 || l40 || l40s ]"
 #BSUB -R rusage[mem=64]
 
