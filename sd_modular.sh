@@ -11,7 +11,7 @@
 #BSUB -R rusage[mem=64]
 
 module load conda
-conda activate /usr/local/usrapps/rkmeente/btfarre2/conda_envs/sd_lora_torch260
+source activate /usr/local/usrapps/rkmeente/btfarre2/conda_envs/sd_lora_torch260
 
 export HF_DATASETS_CACHE=/share/rkmeente/btfarre2/model/model_cache/datasets
 export TRANSFORMERS_CACHE=/share/rkmeente/btfarre2/model/model_cache
@@ -19,7 +19,7 @@ export HF_HOME=/share/rkmeente/btfarre2/model/model_cache
 export TMPDIR=/share/rkmeente/btfarre2/tmp
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-export PATH=/usr/local/usrapps/rkmeente/btfarre2/conda_envs/pytorch/bin:$PATH
+export PATH=/usr/local/usrapps/rkmeente/btfarre2/conda_envs/sd_lora_torch260/bin:$PATH
 export PYTHONPATH=$PYTHONPATH:/home/btfarre2/gsv_host_detector/tree_classification
 
 cd /home/btfarre2/gsv_host_detector/tree_classification
