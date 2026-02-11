@@ -122,8 +122,14 @@ def generate_for_genus(
 
 def main():
     parser = argparse.ArgumentParser(description="Generate images using trained LoRA models")
-    parser.add_argument("--config", type=str, required=True,
-                       help="Path to config JSON file")
+    parser.add_argument("--config", type=str, default=None,
+                       help="Path to config JSON file (for batch mode)")
+    parser.add_argument("--genus", type=str, default=None,
+                       help="Single genus to generate for (subprocess mode)")
+    parser.add_argument("--lora_path", type=str, default=None,
+                       help="Path to LoRA weights (subprocess mode)")
+    parser.add_argument("--output_dir", type=str, default=None,
+                       help="Output directory for generated images (subprocess mode)")
     parser.add_argument("--num_images", type=int, default=12,
                        help="Number of images to generate per genus")
     parser.add_argument("--guidance_scale", type=float, default=7.0,
@@ -135,6 +141,30 @@ def main():
 
     args = parser.parse_args()
 
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    # Call train_lora.py as a subprocess for each genus
+    if args.genus:
+        if not args.lora_path or not args.output_dir:
+            parser.error("--lora_path and --output_dir are required with --genus")
+        base_model_id = "stabilityai/stable-diffusion-3.5-large"
+        success = generate_for_genus(
+            genus=args.genus,
+            lora_path=args.lora_path,
+            base_model_id=base_model_id,
+            output_dir=args.output_dir,
+            num_images=args.num_images,
+            guidance_scale=args.guidance_scale,
+            num_inference_steps=args.num_inference_steps,
+            resolution=args.resolution,
+            device=device
+        )
+        raise SystemExit(0 if success else 1)
+
+    # Batch mode: requires --config
+    if not args.config:
+        parser.error("Either --config (batch mode) or --genus (single mode) is required")
+
     # Load config
     with open(args.config, 'r') as f:
         config = json.load(f)
@@ -142,8 +172,6 @@ def main():
     base_model_id = config.get("model_path", "stabilityai/stable-diffusion-3-medium-diffusers")
     output_base = config["output_path"]
     genera = config["selected_genera"]
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
 
     print(f"\n{'='*60}")
     print(f"IMAGE GENERATION")

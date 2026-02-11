@@ -8,15 +8,6 @@ import os
 import json
 import argparse
 import subprocess
-import torch
-from diffusers import StableDiffusion3Pipeline
-from peft import PeftModel
-import transformers.utils.import_utils as _transformers_import_utils
-
-# Bypass transformers' torch >= 2.6 gate for .bin model files.
-# Our cached weights are local and trusted; we cannot upgrade torch on this HPC.
-# See https://nvd.nist.gov/vuln/detail/CVE-2025-32434
-_transformers_import_utils.check_torch_load_is_safe = lambda: None
 
 from .precompute_latents import precompute_latents
 
@@ -124,68 +115,35 @@ def train_genus(
 
 
 def generate_images_for_genus(genus, lora_path, output_dir, num_images=12):
-    """Generate sample images after training"""
+    """Generate sample images after training by launching a subprocess.
 
-    print(f"\nGenerating sample images for {genus}...")
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    Runs generate_images.py as a separate process so that the CUDA context
+    (and all GPU memory) is fully released when it exits.
+    """
+    import sys
+
+    print(f"\nGenerating sample images for {genus} (subprocess)...")
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    gen_script = os.path.join(script_dir, "generate_images.py")
+
+    cmd = [
+        sys.executable,
+        gen_script,
+        f"--genus={genus}",
+        f"--lora_path={lora_path}",
+        f"--output_dir={output_dir}",
+        f"--num_images={num_images}",
+    ]
+
+    print("Launching generation with command:")
+    print(" ".join(cmd), "\n")
 
     try:
-        # Load pipeline from the model cache directory (not the single .safetensors file)
-        from diffusers import StableDiffusion3Pipeline
-        model_cache_base = os.environ.get("MODEL_CACHE", "/share/rkmeente/btfarre2/model/model_cache")
-        sd3_path = os.path.join(model_cache_base, "stabilityai_stable-diffusion-3.5-large")
-        pipe = StableDiffusion3Pipeline.from_pretrained(
-            sd3_path,
-            torch_dtype=torch.float16
-        )
-
-        # Apply LoRA
-        pipe.transformer = PeftModel.from_pretrained(pipe.transformer, lora_path)
-        pipe = pipe.to(device)
-
-        # Mix of detailed descriptive prompts, realistic contexts, and creative scenarios
-        prompts = [
-            # Detailed street view prompts (LLM-style)
-            f"A street-level Google Street View photograph in bright daylight showing a mature {genus} tree with thick trunk and wide canopy. The tree stands prominently in a suburban residential front yard with well-maintained green lawn. In the foreground, an asphalt street with dappled shadows from the tree canopy. A light-colored sidewalk and paved walkway lead to a blurred house in the background. The tree has rough bark and dense broadleaf foliage casting irregular shadows on the pavement.",
-
-            f"Wide-angle street photograph of a {genus} tree in an urban setting. The scene shows the tree on a city sidewalk with concrete pavement, parked cars visible along the curb. Background shows blurred storefronts and buildings for privacy. The tree trunk rises from a small dirt plot surrounded by sidewalk, with branches spreading overhead. Natural daylight with some cloud shadows.",
-
-            f"Suburban neighborhood photograph featuring a prominent {genus} tree in the center of frame. Front yard setting with green grass, small flowerbeds near the tree base. A straight walkway with rectangular paving stones leads from street to house entrance. The tree has multiple thick branches forming a substantial canopy. Residential houses with gable roofs visible but blurred in background. Clear sky, strong natural lighting creating distinct tree shadows on lawn.",
-
-            # Traditional realistic prompts
-            f"a street-level Google Street View photograph showing a tree of genus {genus}",
-            f"a photo of a mature {genus} tree in a residential neighborhood with houses and sidewalk",
-            f"close up photograph of {genus} tree trunk bark texture and leaf details",
-
-            # Fun creative scenarios
-            f"a {genus} tree standing majestically on NC State University campus with the brick belltower visible in background, students walking nearby",
-            f"a {genus} tree growing on an indoor basketball court, its branches spreading over the hardwood floor and hoops",
-            f"a {genus} tree floating in space near Earth, stars visible in background, cosmic scene",
-            f"a {genus} tree on stage at a rock concert, spotlights shining on it, crowd cheering",
-            f"a {genus} tree on a beach in Atlantis, with the ocean and ancient ruins in background",
-            f"a {genus} tree in a cozy living room next to a fireplace and comfy armchair"
-        ]
-
-        for idx, prompt in enumerate(prompts[:num_images]):
-            with torch.no_grad():
-                image = pipe(
-                    prompt,
-                    negative_prompt="",
-                    guidance_scale=7.0,
-                    num_inference_steps=28,
-                    height=1024,
-                    width=1024
-                ).images[0]
-
-            save_path = os.path.join(output_dir, f"generated_tree{idx}.png")
-            image.save(save_path)
-
-        print(f"Generated {num_images} images for {genus}")
-        del pipe
-        torch.cuda.empty_cache()
+        subprocess.run(cmd, check=True)
+        print(f"Generation subprocess completed for {genus}")
         return True
-
-    except Exception as e:
+    except subprocess.CalledProcessError as e:
         print(f"Image generation failed for {genus}: {e}")
         return False
 
