@@ -9,8 +9,6 @@ import json
 import argparse
 import subprocess
 
-from .precompute_latents import precompute_latents
-
 
 def train_genus(
     genus,
@@ -111,6 +109,42 @@ def train_genus(
         return True
     except subprocess.CalledProcessError as e:
         print(f"\nTraining failed for {genus}: {e}")
+        return False
+
+
+def precompute_latents_subprocess(data_dir, output_dir, model_cache, resolution=1024,
+                                   batch_size=8, mixed_precision="fp16", center_crop=True):
+    """Pre-compute VAE latents by launching a subprocess.
+
+    Runs precompute_latents.py as a separate process so that the CUDA context
+    (and all GPU memory) is fully released when it exits, preventing
+    'CUDA device busy' errors in subsequent training subprocesses.
+    """
+    import sys
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    script = os.path.join(script_dir, "precompute_latents.py")
+
+    cmd = [
+        sys.executable, script,
+        f"--data_dir={data_dir}",
+        f"--output_dir={output_dir}",
+        f"--model_cache={model_cache}",
+        f"--resolution={resolution}",
+        f"--batch_size={batch_size}",
+        f"--mixed_precision={mixed_precision}",
+    ]
+    if center_crop:
+        cmd.append("--center_crop")
+
+    print(f"Launching latent pre-computation subprocess for {data_dir}")
+    print(" ".join(cmd), "\n")
+
+    try:
+        subprocess.run(cmd, check=True)
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Latent pre-computation failed: {e}")
         return False
 
 
@@ -218,7 +252,7 @@ def main():
                 continue
 
             print(f"\nPre-computing latents for {genus}...")
-            precompute_latents(
+            precompute_latents_subprocess(
                 data_dir=genus_data_dir,
                 output_dir=genus_latents_dir,
                 model_cache=model_cache,
