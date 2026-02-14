@@ -4,10 +4,13 @@ SD3 LoRA training script for text-to-image models.
 Based on HuggingFace diffusers training approach, adapted for Stable Diffusion 3.
 """
 
+# MUST be set BEFORE importing torch - cuda initialization happens at import time
+import os
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 import argparse
 import logging
 import math
-import os
 from pathlib import Path
 import json
 
@@ -22,7 +25,6 @@ from tqdm.auto import tqdm
 from transformers import CLIPTokenizer, CLIPTextModelWithProjection, T5Tokenizer, T5EncoderModel
 import transformers.utils.import_utils as _transformers_import_utils
 import numpy as np
-import os
 
 # Bypass transformers' torch >= 2.6 gate for .bin model files.
 # Our cached text-encoder weights are local and trusted; we cannot upgrade torch on this HPC.
@@ -136,9 +138,6 @@ def learning_rate_generator(optimizer, num_warmup_steps, num_training_steps):
 
 def main():
     args = parse_args()
-
-    # Must be set before any CUDA call — ignored if runtime is already initialized
-    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
