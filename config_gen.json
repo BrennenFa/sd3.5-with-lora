@@ -1,0 +1,25 @@
+{
+  "output_path": "/rs1/researchers/c/cmjone25/auto_arborist_cvpr2022_v0.15/data/synthetic",
+  "num_images": 1000,
+  "guidance_scale": 7.5,
+  "num_inference_steps": 30,
+  "resolution": 1024,
+  "selected_genera": [
+    "acer", "fraxinus", "quercus", "prunus", "pinus",
+    "ailanthus", "malus", "pyrus", "picea", "ulmus",
+    "fagus", "betula", "juniperus", "juglans", "citrus",
+    "magnolia", "washingtonia", "catalpa", "populus", "thuja"
+  ],
+  "prompts": [
+    "Street-level photograph of a mature {genus} tree on a residential street, showing distinctive bark texture and branch structure characteristic of the species, clear daylight, trees casting shadows on pavement and lawn",
+    "Google Street View angle photograph of a {genus} tree in front yard, close enough to see leaf shape, size and arrangement details on branches, rough concrete sidewalk and green grass background",
+    "Urban street photograph featuring a {genus} tree growing from sidewalk planter or yard, full view of canopy shape and foliage density, asphalt street and buildings in soft focus background",
+    "Suburban residential photograph of a {genus} tree with focus on trunk diameter, bark pattern, and crown structure, houses and landscaping blurred in background, bright natural lighting",
+    "Close-up street view of {genus} tree leaves and small branches, showing characteristic leaf morphology, color, texture and arrangement for the genus, depth of field keeps trunk visible",
+    "Wide street photography of {genus} tree showing overall form and size relative to nearby houses and utility lines, typical suburban tree setup with grass and sidewalk",
+    "Detailed photograph of {genus} tree bark texture and trunk characteristics, lower branches visible with full foliage, street and yard context visible around base",
+    "Street-level view of {genus} tree in spring or bloom period if applicable, showing flowers or emerging leaves, residential setting with driveway or street visible",
+    "Photograph of mature {genus} tree showing seasonal characteristics - fall colors, or evergreen foliage, or fruiting structures visible in canopy, street and neighbors blurred",
+    "Google Maps Street View style photograph of {genus} tree positioned as a prominent street tree, full height visible in frame, showing natural growing form, shadows indicating time of day"
+  ]
+}
