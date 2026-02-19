@@ -60,8 +60,6 @@ def parse_args():
     parser.add_argument("--lr_warmup_steps", type=int, default=0)
     parser.add_argument("--dataloader_num_workers", type=int, default=0)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--validation_prompt", type=str, default=None)
-    parser.add_argument("--validation_epochs", type=int, default=1)
     parser.add_argument("--checkpointing_steps", type=int, default=500)
     parser.add_argument("--checkpoints_total_limit", type=int, default=None)
     parser.add_argument("--report_to", type=str, default="none")
