@@ -1,4 +1,12 @@
 #!/bin/bash
+#BSUB -n 1
+#BSUB -W 10
+#BSUB -J cleanup_old_outputs
+#BSUB -o stdout.%J
+#BSUB -e stderr.%J
+#BSUB -q debug
+#BSUB -R rusage[mem=2]
+
 # Deletes lora_weights/ and synth3.5/ from each genus folder
 # under synthetic/autoarborist/ and synthetic/inat/
 
