@@ -345,9 +345,7 @@ def main():
     # Compute text embeddings 
     logger.info("Computing text embeddings...")
     
-    # Extract genus name from train_data_dir
-    genus = os.path.basename(args.train_data_dir.rstrip('/'))
-    prompt = f"a street-level Google Street View photograph of a tree, genus {genus}, urban environment"
+    prompt = "A photo of a tree"  # Static caption for precomputing text encodings in SD3.5
 
     # Tokenize with all three encoders
     tokens_l = tokenizer_l(prompt, padding="max_length", max_length=77, truncation=True, return_tensors="pt").input_ids.to(device)
