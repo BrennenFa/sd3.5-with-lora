@@ -385,7 +385,7 @@ def main():
     encoder_hidden_states = encoder_hidden_states.to(weight_dtype)
     pooled_embeds = pooled_embeds.to(weight_dtype)
 
-    logger.info(f"Text embeddings computed for genus: {genus}")
+    logger.info(f"Text embeddings computed for prompt: {prompt}")
 
     # Free text encoders from GPU (no longer needed)
     logger.info("Offloading text encoders from GPU to free memory...")
