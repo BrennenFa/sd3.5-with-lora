@@ -87,7 +87,6 @@ def generate_for_genus(
         dataset_type=dataset_type,
         genus=genus,
         num_prompts=num_images,
-        seed=42
     )
 
     negative_prompt = get_negative_prompt(dataset_type)
