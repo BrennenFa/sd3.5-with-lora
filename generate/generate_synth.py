@@ -23,6 +23,45 @@ from prompts_dynamic import generate_prompt_batch, get_negative_prompt, normaliz
 _transformers_import_utils.check_torch_load_is_safe = lambda: None
 
 
+def load_skip_set(skip_file):
+    """Load skip entries from text file into a set of 'dataset:genus' keys."""
+    if not skip_file:
+        return set()
+
+    skip_path = Path(skip_file)
+    if not skip_path.exists():
+        print(f"Skip-list file not found: {skip_file}. Continuing without skip list.")
+        return set()
+
+    skip_set = set()
+    with open(skip_path, "r") as f:
+        for line in f:
+            key = line.strip().lower()
+            if not key or key.startswith("#"):
+                continue
+            skip_set.add(key)
+
+    print(f"Loaded {len(skip_set)} skip entries from {skip_file}")
+    return skip_set
+
+
+def record_completed(skip_file, skip_set, dataset_name, genus):
+    if not skip_file:
+        return
+
+    key = f"{dataset_name}:{genus}".lower()
+    if key in skip_set:
+        return
+
+    skip_path = Path(skip_file)
+    skip_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(skip_path, "a") as f:
+        f.write(f"{key}\n")
+
+    skip_set.add(key)
+    print(f"{key} recorded in skip file")
+
+
 def generate_for_genus(
     genus,
     dataset_type,
@@ -188,6 +227,12 @@ def main():
         required=True,
         help="Path to config JSON file"
     )
+    parser.add_argument(
+        "--skip_genera_file",
+        type=str,
+        default=None,
+        help="Path to text file with entries like dataset:genus (one per line)"
+    )
 
     args = parser.parse_args()
 
@@ -197,6 +242,8 @@ def main():
 
     num_images = config['num_images']
     dataset_type = normalize_dataset_type(config['dataset_type'])
+    skip_genera_file = args.skip_genera_file or config.get("skip_genera_file")
+    skip_set = load_skip_set(skip_genera_file)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
@@ -225,17 +272,15 @@ def main():
         results[dataset_name] = {}
 
         for genus, lora_path in sorted(structure[dataset_name].items()):
+            key = f"{dataset_name}:{genus}".lower()
+            if key in skip_set:
+                print(f"\n{genus}: listed in skip file, skipping...")
+                results[dataset_name][genus] = "skipped"
+                continue
+
             # Output directory: {synth_root}/{dataset}/{genus}/synth3.5/
             genus_path = synth_path / dataset_name / genus
             output_dir = genus_path / "synth3.5"
-
-            # Skip if images already exist
-            if output_dir.exists():
-                existing_images = list(output_dir.glob(f"{genus}_*.png"))
-                if len(existing_images) >= num_images:
-                    print(f"\n{genus}: {len(existing_images)} images already exist, skipping...")
-                    results[dataset_name][genus] = "skipped"
-                    continue
 
             success = generate_for_genus(
                 genus=genus,
@@ -249,6 +294,9 @@ def main():
                 resolution=config['resolution'],
                 device=device
             )
+
+            if success:
+                record_completed(skip_genera_file, skip_set, dataset_name, genus)
 
             results[dataset_name][genus] = "success" if success else "failed"
 

@@ -1,0 +1,8 @@
+inat:acer
+inat:ailanthus
+inat:betula
+inat:catalpa
+inat:citrus
+inat:fagus
+inat:fraxinus
+inat:juglans

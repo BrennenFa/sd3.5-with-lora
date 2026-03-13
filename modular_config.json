@@ -26,5 +26,6 @@
   "enable_xformers": true,
   "num_images": 1000,
   "guidance_scale": 7.5,
-  "num_inference_steps": 30
+  "num_inference_steps": 30,
+  "skip_genera_file": "generate/skip_genera.txt"
 }
